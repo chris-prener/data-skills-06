@@ -5,8 +5,8 @@ Christopher Prener, Ph.D.
 
 ## Dependencies
 
-This notebook requires two packages from the `tidyverse` as well as two
-additional packages:
+This notebook requires three packages from the `tidyverse` as well as
+two additional packages:
 
 ``` r
 # tidyverse packages
@@ -421,6 +421,8 @@ what to change:
   `"Delta"` and `"BA.1"`
 - We don’t need all of the columns
 - The percentage values are string, and could be rounded
+  - Since this part is a bit wonky, here is the code we’ll start with
+    `round(as.numeric(ifelse(x == "NULL", NA, x)), digits = 4)*100`
 
 Now, let’s work on implementing some of those changes:
 
@@ -446,20 +448,31 @@ cdc_clean %>%
 ## create who labels out of pangos
 cdc_clean <- left_join(cdc_clean, variants, by = "pango")
 
-## remove columns
-cdc_clean <- select(cdc_clean, region, week, pango, who, variant, 
-                    pct, pct_ci_lo, pct_ci_hi)
+## remove columns and clean up pcts
+cdc_clean %>%
+  select(region, week, pango, who, variant, pct, pct_ci_lo, pct_ci_hi) %>%
+  mutate(
+    pct = round(as.numeric(ifelse(pct == "NULL", NA, pct)), digits = 4)*100,
+    pct_ci_lo = round(as.numeric(ifelse(pct_ci_lo == "NULL", NA, pct_ci_lo)), digits = 4)*100,
+    pct_ci_hi = round(as.numeric(ifelse(pct_ci_hi == "NULL", NA, pct_ci_hi)), digits = 4)*100
+  ) -> cdc_final
 ```
 
-We have one task left, which is to tidy up our percentage column values.
-To do this, we’re going to use a custom function - this allows us to get
-a preview of where we are headed next time, which is to create functions
-ourselves. We use the `function()` function, and specify that we have
-one argument, `x`. This will be substituted in the next code chunk for a
-column name. We then apply four changes to `x` inside the function,
-ultimately returning a modified function that is numeric, has `NA`
-values handled appropriately, is rounded, and has been multiplied by
-100.
+This code will become the basis for writing a function in our next
+session that packages up our code for reuse week after week.
+
+## Bonus Content
+
+Notice how we applied the same exact code three times in our final
+`mutate()` call above. We can change our implementation here to be more
+efficient in two ways. First, we can wrap up those steps to a function
+we’ve written ourselves. This allows us to get a preview of where we are
+headed next time, which is to create functions ourselves. We use the
+`function()` function, and specify that we have one argument, `x`. This
+will be substituted in the next code chunk for a column name. We then
+apply four changes to `x` inside the function, ultimately returning a
+modified function that is numeric, has `NA` values handled
+appropriately, is rounded, and has been multiplied by 100.
 
 ``` r
 clean_pcts <- function(x){
@@ -487,13 +500,12 @@ function may have arguments, and the `.x` syntax to designate where
 individual column names should be passed to our function.
 
 ``` r
-## clean up percentages
-cdc_clean <- mutate(cdc_clean, across(.cols = c(pct, pct_ci_lo, pct_ci_hi), 
-                                      .fns = ~clean_pcts(x = .x)))
+## remove columns and clean up pcts
+cdc_clean %>%
+  select(region, week, pango, who, variant, pct, pct_ci_lo, pct_ci_hi) %>%
+  mutate(across(.cols = c(pct, pct_ci_lo, pct_ci_hi), 
+                .fns = ~clean_pcts(x = .x))) -> cdc_final_fn
 ```
 
 This process also introduces iteration - in this case, efficiently
 applying code over three columns!
-
-This code will become the basis for writing a function in our next
-session that packages up our code for reuse week after week.
